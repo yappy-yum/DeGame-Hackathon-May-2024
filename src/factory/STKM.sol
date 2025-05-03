@@ -18,8 +18,6 @@ contract STKM is ISTKM, ERC20("STICKMAN", "STKM"), Ownable(msg.sender) {
     error STKM__BurnZero();
     error STKM__ApprovingZero();
     error STKM__transferZero();
-    error STKM__transferFailed();
-    error STKM__transferFromFailed();
 
     /*//////////////////////////////////////////////////////////////
                                   mint
@@ -81,8 +79,7 @@ contract STKM is ISTKM, ERC20("STICKMAN", "STKM"), Ownable(msg.sender) {
     {
         if (_amount == 0) revert STKM__transferZero();
 
-        bool done = super.transfer(_to, _amount);
-        if (!done) revert STKM__transferFailed();
+        super.transfer(_to, _amount);
 
         _mintUserAccruedRewards(msg.sender);
         _mintUserAccruedRewards(_to);
@@ -109,8 +106,7 @@ contract STKM is ISTKM, ERC20("STICKMAN", "STKM"), Ownable(msg.sender) {
     ) public override(ISTKM, ERC20) returns(bool) {
         if (_amount == 0) revert STKM__transferZero();
 
-        bool done = super.transferFrom(_owner, _receiver, _amount);
-        if (!done) revert STKM__transferFromFailed();
+        super.transferFrom(_owner, _receiver, _amount);
 
         _mintUserAccruedRewards(_receiver);
         _mintUserAccruedRewards(_owner);
@@ -171,6 +167,8 @@ contract STKM is ISTKM, ERC20("STICKMAN", "STKM"), Ownable(msg.sender) {
     function balanceOf(address _user) public override(ISTKM, ERC20) view returns (uint256) {
         uint rewards = _accruedDailyRewards(_user);
 
+        // @audit hypothetically unreachable, but just incase :D
+        //        remove it to get 100% coverage for this contract
         if (rewards == type(uint).max) {
             return super.balanceOf(_user);
         }

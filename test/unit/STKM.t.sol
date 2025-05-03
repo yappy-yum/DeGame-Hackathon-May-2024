@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import {fundBalance} from "../fundBalance.sol";
+// import {fundBalance} from "../fundBalance.sol";
 import {STKM_S} from "script/STKM.s.sol";
 import {STKM} from "src/factory/STKM.sol";
 import {Test, console} from "forge-std/Test.sol";
 
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
-contract STKM_T is Test, fundBalance {
+contract STKM_T is Test {
 
     STKM s_STKM;
 
@@ -20,6 +20,20 @@ contract STKM_T is Test, fundBalance {
         STKM_S s = new STKM_S();
         s_STKM = s.run();
     }
+
+    /*//////////////////////////////////////////////////////////////
+                             token setting
+    //////////////////////////////////////////////////////////////*/    
+
+    function test_setting_token() public view {
+        assertEq(s_STKM.name(), "STICKMAN");
+        assertEq(s_STKM.symbol(), "STKM");
+        assertEq(s_STKM.totalSupply(), 0 ether);
+    }
+
+    function test_contract_owner() public view {
+        assertEq(s_STKM.owner(), Owner);
+    }    
 
     /*//////////////////////////////////////////////////////////////
                                 buySTKM
