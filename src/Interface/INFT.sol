@@ -84,6 +84,15 @@ interface INFT {
      */
     function acceptTrade(address _ownerB, uint256 _tokenIdB, uint256 _tradeId) external;    
 
+    /**
+     * @notice reject the trades
+     * @param _ownerB The address of the owner of the NFT B
+     * @param _tokenIdB The token id of the NFT B
+     * @param _tradeId The trade id
+     *
+     */
+    function rejectTrade(address _ownerB, uint256 _tokenIdB, uint256 _tradeId) external;    
+
     /*//////////////////////////////////////////////////////////////
                                  getter
     //////////////////////////////////////////////////////////////*/        
@@ -120,4 +129,19 @@ interface INFT {
      *
      */
     function getPastTradeHistory(uint256 tradeId) external view returns (Trade memory);
+
+    /**
+     * @notice Returns if the token is on queue to wait for trade
+     * @param tokenId The token id of the NFT
+     *
+     */
+    function isTokenOnQueue(uint256 tokenId) external view returns (bool);    
+
+    /**
+     * @notice check the owner/holder of the NFT `tokenId`
+     * @param tokenId The token id of the NFT
+     *
+     */
+    function ownerOf(uint tokenId) external view returns (address);    
+    
 }

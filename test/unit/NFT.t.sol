@@ -174,7 +174,7 @@ contract NFT_T is Test {
         vm.startPrank(Owner);
 
         // Bob sells NFT that not belongs to him
-        vm.expectRevert(NFT.NFT__NFTNotOwnedOrNotExist.selector);
+        vm.expectRevert(NFT.NFT__SomethingWentWrong.selector);
         s_NFT.listNFT(Bob, 5, 10 ether);
 
         vm.stopPrank();
@@ -198,9 +198,10 @@ contract NFT_T is Test {
 
         // Alice list NFT
         s_NFT.listNFT(Alice, 5, 10 ether);
+        assertEq(s_NFT.isTokenOnQueue(5), true);
 
         // Alice list NFT again
-        vm.expectRevert(NFT.NFT__AlreadyListed.selector);
+        vm.expectRevert(NFT.NFT__SomethingWentWrong.selector);
         s_NFT.listNFT(Alice, 5, 10 ether);
 
         vm.stopPrank();
@@ -216,9 +217,16 @@ contract NFT_T is Test {
         assertEq(s_NFT.ownerOf(5), Bob);
         assertEq(s_NFT.ownerOf(10), Alice);
 
+        assertEq(s_NFT.isTokenOnQueue(5), false);
+        assertEq(s_NFT.isTokenOnQueue(10), false);
+
+        // Bob do resell
         skip(3 days);
         uint BobListingTimeStamp = block.timestamp;
         s_NFT.listNFT(Bob, 5, 10 ether);
+
+        assertEq(s_NFT.isTokenOnQueue(5), true);
+        assertEq(s_NFT.isTokenOnQueue(10), false);
 
         skip(2 days);
         uint AliceListingTimeStamp = block.timestamp;
@@ -241,7 +249,8 @@ contract NFT_T is Test {
         assertEq(AliceResellStruct.timeListed, AliceListingTimeStamp);
         assertEq(AliceResellStruct.timeSold, 0);
 
-
+        assertEq(s_NFT.isTokenOnQueue(5), true);
+        assertEq(s_NFT.isTokenOnQueue(10), true);
 
         vm.stopPrank();
     }
@@ -269,6 +278,7 @@ contract NFT_T is Test {
 
         s_NFT.mint(Alice, 5);
         s_NFT.listNFT(Alice, 5, 10 ether);
+        assertEq(s_NFT.isTokenOnQueue(5), true);
 
         vm.expectRevert(NFT.NFT__ListingNotFound.selector);
         s_NFT.unListNFT(Bob, 5);
@@ -277,6 +287,7 @@ contract NFT_T is Test {
         s_NFT.unListNFT(Alice, 20);
 
         vm.stopPrank();
+        assertEq(s_NFT.isTokenOnQueue(5), true);
     }
 
     function test_can_unList() public {
@@ -284,6 +295,7 @@ contract NFT_T is Test {
 
         s_NFT.mint(Alice, 5);
         s_NFT.listNFT(Alice, 5, 10 ether);
+        assertEq(s_NFT.isTokenOnQueue(5), true);
 
         // check listing
         NFT.reSell memory AliceResellStruct = s_NFT.getCurrentResell(5);
@@ -295,6 +307,7 @@ contract NFT_T is Test {
         assertEq(AliceResellStruct.timeSold, 0);
 
         s_NFT.unListNFT(Alice, 5);
+        assertEq(s_NFT.isTokenOnQueue(5), false);
 
         // check listing again
         AliceResellStruct = s_NFT.getCurrentResell(5);
@@ -327,9 +340,16 @@ contract NFT_T is Test {
         // Alice and Bob buys NFT
         s_NFT.mint(Alice, 5);
         s_NFT.mint(Bob, 3);
+        assertEq(s_NFT.ownerOf(5), Alice);
+        assertEq(s_NFT.ownerOf(3), Bob);
+
+        assertEq(s_NFT.isTokenOnQueue(5), false);
+        assertEq(s_NFT.isTokenOnQueue(3), false);
 
         // Alice resell NFT
         s_NFT.listNFT(Alice, 5, 10 ether);
+        assertEq(s_NFT.isTokenOnQueue(5), true);
+        assertEq(s_NFT.isTokenOnQueue(3), false);
 
         uint firstTimestamp = block.timestamp;
 
@@ -348,6 +368,8 @@ contract NFT_T is Test {
 
         // Bob buys Alice NFT-5
         s_NFT.buyListingNFT(Bob, 5);
+        assertEq(s_NFT.isTokenOnQueue(5), false);
+        assertEq(s_NFT.isTokenOnQueue(3), false);
 
         // check listing again for NFT-5
         AliceResellStruct = s_NFT.getCurrentResell(5);
@@ -370,6 +392,8 @@ contract NFT_T is Test {
 
         // Bob list NFT-3
         s_NFT.listNFT(Bob, 3, 50 ether);
+        assertEq(s_NFT.isTokenOnQueue(5), false);
+        assertEq(s_NFT.isTokenOnQueue(3), true);
 
         // check listing again for NFT-3
         NFT.reSell memory BobResellStruct = s_NFT.getCurrentResell(3);
@@ -384,6 +408,8 @@ contract NFT_T is Test {
 
         // Owner buy the Bob listing
         s_NFT.buyListingNFT(Owner, 3);
+        assertEq(s_NFT.isTokenOnQueue(5), false);
+        assertEq(s_NFT.isTokenOnQueue(3), false);
 
         // check listing again for NFT-3
         BobResellStruct = s_NFT.getCurrentResell(3);
@@ -447,11 +473,11 @@ contract NFT_T is Test {
     function test_both_party_must_be_ownerOf_NFT() public {
         vm.startPrank(Owner);
 
-        vm.expectRevert(NFT.NFT__NFTANotOwnerA.selector);
+        vm.expectRevert(NFT.NFT__SomethingWentWrong.selector);
         s_NFT.createTrade(Bob, Alice, 5, 10 ether);
 
         s_NFT.mint(Alice, 5);
-        vm.expectRevert(NFT.NFT__NFTBNotOwnerB.selector);
+        vm.expectRevert(NFT.NFT__SomethingWentWrong.selector);
         s_NFT.createTrade(Alice, Bob, 5, 10 ether);
 
         vm.stopPrank();
@@ -463,6 +489,10 @@ contract NFT_T is Test {
         s_NFT.mint(Alice, 5);
         s_NFT.mint(Bob, 10);
 
+        assertEq(s_NFT.isTokenOnQueue(5), false);
+        assertEq(s_NFT.isTokenOnQueue(10), false);
+
+        // create trades
         assertEq(s_NFT.createTrade(Alice, Bob, 5, 10), 0);
 
         // checks trade
@@ -473,6 +503,9 @@ contract NFT_T is Test {
         assertEq(trade._tokenIdB, 10);
         assertEq(trade._approvedA, true);
         assertEq(trade._approvedB, false);
+
+        assertEq(s_NFT.isTokenOnQueue(5), true);
+        assertEq(s_NFT.isTokenOnQueue(10), true);
 
         vm.stopPrank();
     }
@@ -494,9 +527,28 @@ contract NFT_T is Test {
     }   
 
     function test_notradesFound() public {
-        vm.expectRevert(NFT.NFT__TradeNotFound.selector);
-        vm.prank(Owner);
+        vm.startPrank(Owner);
+
+        vm.expectRevert(NFT.NFT__NFTNotOnQueue.selector);
         s_NFT.acceptTrade(Bob, 20, 2);
+
+        s_NFT.mint(Alice, 5);
+        s_NFT.mint(Bob, 10);
+
+        assertEq(s_NFT.isTokenOnQueue(5), false);
+        assertEq(s_NFT.isTokenOnQueue(10), false);
+
+        // Alice create trades, but accepter is not Bob
+        assertEq(s_NFT.createTrade(Alice, Bob, 5, 10), 0);
+
+        vm.expectRevert(NFT.NFT__TradeNotFound.selector);
+        s_NFT.acceptTrade(Owner, 10, 0);
+
+        // is Bob, but incorrect trade ID
+        vm.expectRevert(NFT.NFT__TradeNotFound.selector);
+        s_NFT.acceptTrade(Bob, 10, 1);
+
+        vm.stopPrank();
     } 
 
     function test_can_acceptTrade() public {
@@ -508,6 +560,9 @@ contract NFT_T is Test {
 
         assertEq(s_NFT.ownerOf(5), Alice);
         assertEq(s_NFT.ownerOf(10), Bob);
+
+        assertEq(s_NFT.isTokenOnQueue(5), false);
+        assertEq(s_NFT.isTokenOnQueue(10), false);
 
         // 2. create trade
         assertEq(s_NFT.createTrade(Alice, Bob, 5, 10), 0);
@@ -521,6 +576,9 @@ contract NFT_T is Test {
         assertEq(trade._approvedA, true);
         assertEq(trade._approvedB, false); 
 
+        assertEq(s_NFT.isTokenOnQueue(5), true);
+        assertEq(s_NFT.isTokenOnQueue(10), true);
+
         // 4. Bob accept trades
         s_NFT.acceptTrade(Bob, 10, 0);
 
@@ -533,7 +591,197 @@ contract NFT_T is Test {
         assertEq(trade._approvedA, true);
         assertEq(trade._approvedB, true);
 
+        assertEq(s_NFT.isTokenOnQueue(5), false);
+        assertEq(s_NFT.isTokenOnQueue(10), false);
+
         vm.stopPrank();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                              rejectTrade
+    //////////////////////////////////////////////////////////////*/
+
+    function test_onlyOwner_can_rejectTrade() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector, 
+                Bob
+            )
+        );
+
+        vm.prank(Bob);
+        s_NFT.rejectTrade(Bob, 20, 2);
+    }    
+
+    function test_NFT_not_queue() public {
+        vm.expectRevert(NFT.NFT__NFTNotOnQueue.selector);
+
+        vm.prank(Owner);
+        s_NFT.rejectTrade(Bob, 20, 2);        
+    }
+
+    function test_no_prior_trades() public {
+        vm.startPrank(Owner);
+
+        // 1. mint NFT
+        s_NFT.mint(Alice, 5);
+        s_NFT.mint(Bob, 10);
+
+        assertEq(s_NFT.ownerOf(5), Alice);
+        assertEq(s_NFT.ownerOf(10), Bob);
+
+        assertEq(s_NFT.isTokenOnQueue(5), false);
+        assertEq(s_NFT.isTokenOnQueue(10), false);
+
+        // 2. create trade
+        assertEq(s_NFT.createTrade(Alice, Bob, 5, 10), 0);
+
+        // 3. checks trade
+        NFT.Trade memory trade = s_NFT.getPastTradeHistory(0);
+        assertEq(trade._ownerA, Alice);
+        assertEq(trade._ownerB, Bob);
+        assertEq(trade._tokenIdA, 5);
+        assertEq(trade._tokenIdB, 10);
+        assertEq(trade._approvedA, true);
+        assertEq(trade._approvedB, false);
+
+        assertEq(s_NFT.isTokenOnQueue(5), true);
+        assertEq(s_NFT.isTokenOnQueue(10), true);
+
+        // 4. reject incorrect trades
+        vm.expectRevert(NFT.NFT__NFTNotOnQueue.selector);
+        s_NFT.rejectTrade(Bob, 20, 2);
+
+        vm.expectRevert(NFT.NFT__TradeNotFound.selector);
+        s_NFT.rejectTrade(Alice, 5, 2);
+
+        vm.expectRevert(NFT.NFT__TradeNotFound.selector);
+        s_NFT.rejectTrade(Bob, 5, 0);
+
+        vm.stopPrank();
+    }
+
+    function test_can_rejectTrade() public {
+        vm.startPrank(Owner);
+
+        // 1. mint NFT
+        s_NFT.mint(Alice, 5);
+        s_NFT.mint(Bob, 10);
+
+        assertEq(s_NFT.ownerOf(5), Alice);
+        assertEq(s_NFT.ownerOf(10), Bob);
+
+        assertEq(s_NFT.isTokenOnQueue(5), false);
+        assertEq(s_NFT.isTokenOnQueue(10), false);
+
+        // 2. Alice create trade
+        assertEq(s_NFT.createTrade(Alice, Bob, 5, 10), 0);
+
+        // 3. checks trade info
+        NFT.Trade memory trade = s_NFT.getPastTradeHistory(0);
+        assertEq(trade._ownerA, Alice);
+        assertEq(trade._ownerB, Bob);
+        assertEq(trade._tokenIdA, 5);
+        assertEq(trade._tokenIdB, 10);
+        assertEq(trade._approvedA, true);
+        assertEq(trade._approvedB, false);
+
+        assertEq(s_NFT.isTokenOnQueue(5), true);
+        assertEq(s_NFT.isTokenOnQueue(10), true);
+
+        // 4. Bob reject trade
+        s_NFT.rejectTrade(Bob, 10, 0);
+
+        trade = s_NFT.getPastTradeHistory(0);
+        assertEq(trade._ownerA, Alice);
+        assertEq(trade._ownerB, Bob);
+        assertEq(trade._tokenIdA, 5);
+        assertEq(trade._tokenIdB, 10);
+        assertEq(trade._approvedA, true);
+        assertEq(trade._approvedB, false);
+
+        assertEq(s_NFT.isTokenOnQueue(5), false);
+        assertEq(s_NFT.isTokenOnQueue(10), false);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                             test transact
+    //////////////////////////////////////////////////////////////*/
+
+    function test_approve_has_deprecated() public {
+        vm.expectRevert("this function has deprecated");
+        s_NFT.approve(Bob, 5);  
+    }
+
+    function test_transferFrom_cannot_transfer_onqueue() public {
+        vm.startPrank(Owner);
+
+        // 1. mint and list the NFT
+        s_NFT.mint(Alice, 5);
+        s_NFT.listNFT(Alice, 5, 10 ether);
+        assertEq(s_NFT.isTokenOnQueue(5), true);
+
+        vm.stopPrank();
+
+        vm.expectRevert(NFT.NFT__NotAvailable.selector);
+        
+        // 2. transfer failed due to the listing
+        vm.prank(Alice);
+        s_NFT.transferFrom(Alice, Bob, 5);
+
+        // 3. unlist first
+        vm.prank(Owner);
+        s_NFT.unListNFT(Alice, 5);
+        assertEq(s_NFT.isTokenOnQueue(5), false);
+
+        // 4. transfer success
+        vm.prank(Alice);
+        s_NFT.transferFrom(Alice, Bob, 5);
+
+        assertEq(s_NFT.ownerOf(5), Bob);
+        assertNotEq(s_NFT.ownerOf(5), Alice);
+
+        // 5. this function also reverts if msg.sender != from
+        vm.expectRevert(NFT.NFT__OnlyAllowedNFTOwnerTransfer.selector);
+
+        vm.prank(Alice);
+        s_NFT.transferFrom(Bob, Alice, 5);
+
+    }
+
+    function test_safeTransferFrom_cannot_transfer_onqueue() public {
+        vm.startPrank(Owner);
+
+        // 1. mint and list the NFT
+        s_NFT.mint(Alice, 5);
+        s_NFT.listNFT(Alice, 5, 10 ether);
+        assertEq(s_NFT.isTokenOnQueue(5), true);
+
+        vm.stopPrank();
+
+        vm.expectRevert(NFT.NFT__NotAvailable.selector);
+        
+        // 2. transfer failed due to the listing
+        vm.prank(Alice);
+        s_NFT.safeTransferFrom(Alice, Bob, 5, "");
+
+        // 3. unlist first
+        vm.prank(Owner);
+        s_NFT.unListNFT(Alice, 5);
+        assertEq(s_NFT.isTokenOnQueue(5), false);
+
+        // 4. transfer success
+        vm.prank(Alice);
+        s_NFT.safeTransferFrom(Alice, Bob, 5, "");
+
+        assertEq(s_NFT.ownerOf(5), Bob);
+        assertNotEq(s_NFT.ownerOf(5), Alice); 
+
+        // 5. this function also reverts if msg.sender != from
+        vm.expectRevert(NFT.NFT__OnlyAllowedNFTOwnerTransfer.selector);
+
+        vm.prank(Alice);
+        s_NFT.safeTransferFrom(Bob, Alice, 5, "");       
     }
 
 }

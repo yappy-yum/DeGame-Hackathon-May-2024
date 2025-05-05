@@ -10,6 +10,4 @@ abstract contract fundBalance is Test {
         _;
     }
 
-    function testNothing() public pure {}
-
 }

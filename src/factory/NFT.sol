@@ -34,18 +34,17 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
     using Strings for uint256;
 
     error NFT__NFTOwned();
-    error NFT__NFTNotOwnedOrNotExist();
-    error NFT__AlreadyListed();
     error NFT__ListingNotFound();
     error NFT__NoSellingForFree();
     error NFT__NoZeroAddress();
-    error NFT__NFTANotOwnerA();
-    error NFT__NFTBNotOwnerB();
-    error NFT__TradeNotApproved();
     error NFT__TradeNotFound();
     error NFT__SameOwner();
     error NFT__NFTNotFound();
     error NFT__ZeroAddress();
+    error NFT__NFTNotOnQueue();
+    error NFT__SomethingWentWrong();
+    error NFT__NotAvailable();
+    error NFT__OnlyAllowedNFTOwnerTransfer();
 
     string private s_baseMetaURI;
 
@@ -80,15 +79,7 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
     //////////////////////////////////////////////////////////////*/
 
     uint private resellID = 0;
-    
-    // struct reSell { 
-    //     address owner; // re-seller
-    //     address buyer; // buyer who buy the re-sell NFT
-    //     uint256 sellingPrice;  // price of the re-sell NFT
-    //     uint256 tokenId; // token id to re-sell
-    //     uint timeListed; // the time the NFT listed (ready to sell)
-    //     uint timeSold;  // the time the NFT sold
-    // }
+
     mapping(uint256 resellId => reSell reSellInfo) private s_pastReSellHistory;
     mapping(uint256 tokenId => reSell reSellInfo) private s_currentResellTokens;
 
@@ -106,24 +97,11 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
         uint256 _tokenId, 
         uint256 _price
     ) external onlyOwner {
-        // reSell storage info = s_currentResellTokens[_tokenId];
-
-        // if (_price == 0) revert NFT__NoSellingForFree();
-        // if (_owner == address(0)) revert NFT__ZeroAddress();
-        // if (_ownerOf(_tokenId) != _owner) revert NFT__NFTNotOwnedOrNotExist();
-        // if (info.owner != address(0)) revert NFT__AlreadyListed();
-
-        // info.owner = _owner;
-        // info.sellingPrice = _price;
-        // info.tokenId = _tokenId;
-        // info.timeListed = block.timestamp;
-
-        // s_currentResellTokens[_tokenId] = info;
-
         if (_price == 0) revert NFT__NoSellingForFree();
         if (_owner == address(0)) revert NFT__ZeroAddress();
-        if (_ownerOf(_tokenId) != _owner) revert NFT__NFTNotOwnedOrNotExist();
-        if (s_currentResellTokens[_tokenId].owner != address(0)) revert NFT__AlreadyListed();
+
+        (bool ok) = _isValidate(_owner, _tokenId);
+        if (!ok) revert NFT__SomethingWentWrong();
 
         assembly {
             mstore(0x00, _tokenId)
@@ -135,6 +113,7 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
             sstore(add(base, 3), _tokenId)    
             sstore(add(base, 4), timestamp()) 
         }
+        _setTokenOnQueue(_tokenId, 1);
     }  
 
     /**
@@ -145,9 +124,9 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
      */
     function unListNFT(address _owner, uint256 _tokenId) external onlyOwner {
         reSell storage info = s_currentResellTokens[_tokenId];
+
         if (info.owner != _owner || info.tokenId != _tokenId) revert NFT__ListingNotFound();
 
-        // delete s_currentResellTokens[_tokenId];
         assembly {
             mstore(0x00, _tokenId)
             mstore(0x20, s_currentResellTokens.slot)
@@ -160,6 +139,7 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
             sstore(add(base, 4), 0)   
             sstore(add(base, 5), 0)   
         }
+        _setTokenOnQueue(_tokenId, 0);
     }
 
     /**
@@ -173,14 +153,6 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
         if (info.tokenId != _tokenId) revert NFT__ListingNotFound();
         _transfer(info.owner, _buyer, _tokenId);
 
-        // s_pastReSellHistory[resellID] = reSell({
-        //     owner: info.owner,
-        //     buyer: _buyer,
-        //     sellingPrice: info.sellingPrice,
-        //     tokenId: _tokenId,
-        //     timeListed: info.timeListed,
-        //     timeSold: block.timestamp
-        // });
         assembly {
             mstore(0x00, _tokenId)
             mstore(0x20, s_currentResellTokens.slot)
@@ -205,7 +177,6 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
             sstore(resellID.slot, add(sload(resellID.slot), 1))
         }
 
-        // delete s_currentResellTokens[_tokenId];
         assembly {
             mstore(0x00, _tokenId)
             mstore(0x20, s_currentResellTokens.slot)
@@ -218,17 +189,7 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
             sstore(add(base, 4), 0)   
             sstore(add(base, 5), 0)   
         }
-
-
-        // assembly {
-        //     sstore(
-        //         resellID.slot,
-        //         add(
-        //             sload(resellID.slot),
-        //             1
-        //         )
-        //     )
-        // }
+        _setTokenOnQueue(_tokenId, 0);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -236,16 +197,8 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
     //////////////////////////////////////////////////////////////*/
 
     uint256 private tradeID = 0;
-    
-    // struct Trade {
-    //     address _ownerA; // owner of NFT A
-    //     address _ownerB; // owner of NFT B
-    //     uint256 _tokenIdA; // token id of NFT A
-    //     uint256 _tokenIdB; // token id of NFT B
-    //     bool _approvedA; // approved of NFT A
-    //     bool _approvedB; // approved of NFT B (if true, trades has succeed)
-    // }    
     mapping(uint256 tradeId => Trade trade) private s_trades;
+    mapping(uint256 tokenId => bool onqueue) private s_onqueue;
 
     /**
      * @notice start/request/create trade to exchange NFTs
@@ -264,31 +217,9 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
         
         if (_ownerA == address(0) || _ownerB == address(0)) revert NFT__NoZeroAddress();
         if (_ownerA == _ownerB) revert NFT__SameOwner();
-        if (_ownerOf(_tokenIdA) != _ownerA) revert NFT__NFTANotOwnerA();
-        if (_ownerOf(_tokenIdB) != _ownerB) revert NFT__NFTBNotOwnerB();
 
-        // uint256 TradeId = tradeID;
-
-        // s_trades[TradeId] = Trade({
-        //     _ownerA: _ownerA,
-        //     _ownerB: _ownerB,
-        //     _tokenIdA: _tokenIdA,
-        //     _tokenIdB: _tokenIdB,
-        //     _approvedA: true,
-        //     _approvedB: false
-        // });
-
-        // assembly {
-        //     sstore(
-        //         tradeID.slot,
-        //         add(
-        //             sload(tradeID.slot),
-        //             1
-        //         )
-        //     )
-        // }
-
-        // return TradeId;
+        bool ok = _isValidate(_ownerA, _tokenIdA) && _isValidate(_ownerB, _tokenIdB);
+        if (!ok) revert NFT__SomethingWentWrong();
 
         assembly {
             tradeId := sload(tradeID.slot)
@@ -304,8 +235,12 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
             sstore(add(tradeSlot, 4), 1)        
             sstore(add(tradeSlot, 5), 0)        
 
-            sstore(tradeID.slot, add(sload(tradeID.slot), 1))
+            sstore(tradeID.slot, add(sload(tradeID.slot), 1))      
         }
+
+        _setTokenOnQueue(_tokenIdA, 1);
+        _setTokenOnQueue(_tokenIdB, 1);
+
     }
 
     /**
@@ -321,12 +256,60 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
         uint256 _tradeId
     ) external onlyOwner {
         Trade storage trade = s_trades[_tradeId];
+
+        if (!s_onqueue[_tokenIdB]) revert NFT__NFTNotOnQueue();
         if (trade._ownerB != _ownerB || trade._tokenIdB != _tokenIdB) revert NFT__TradeNotFound();
+
+        trade._approvedB = true;
 
         _safeTransfer(trade._ownerA, trade._ownerB, trade._tokenIdA);
         _safeTransfer(trade._ownerB, trade._ownerA, trade._tokenIdB);
 
-        trade._approvedB = true;
+        _setTokenOnQueue(trade._tokenIdA, 0);
+        _setTokenOnQueue(_tokenIdB, 0);      
+    }
+
+    /**
+     * @notice reject the trades
+     * @param _ownerB The address of the owner of the NFT B
+     * @param _tokenIdB The token id of the NFT B
+     * @param _tradeId The trade id
+     *
+     */
+    function rejectTrade(
+        address _ownerB,
+        uint256 _tokenIdB,
+        uint256 _tradeId
+    ) external onlyOwner {
+        Trade storage trade = s_trades[_tradeId];
+
+        if (!s_onqueue[_tokenIdB]) revert NFT__NFTNotOnQueue();
+        if (trade._ownerB != _ownerB || trade._tokenIdB != _tokenIdB) revert NFT__TradeNotFound();
+
+        _setTokenOnQueue(trade._tokenIdA, 0);
+        _setTokenOnQueue(_tokenIdB, 0);        
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                transact
+    //////////////////////////////////////////////////////////////*/
+
+    function approve(address to, uint256 tokenId) public override {
+        revert("this function has deprecated");
+    }    
+
+    function transferFrom(address from, address to, uint tokenId) public override {
+        if (s_onqueue[tokenId]) revert NFT__NotAvailable();
+        if (from != msg.sender) revert NFT__OnlyAllowedNFTOwnerTransfer();
+
+        super.transferFrom(from, to, tokenId);
+    }
+
+    function safeTransferFrom(address from, address to, uint tokenId, bytes memory data) public override {
+        if (s_onqueue[tokenId]) revert NFT__NotAvailable();
+        if (from != msg.sender) revert NFT__OnlyAllowedNFTOwnerTransfer();
+        
+        super.safeTransferFrom(from, to, tokenId, data);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -375,6 +358,43 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
      */
     function getPastTradeHistory(uint256 tradeId) external view returns (Trade memory) {
         return s_trades[tradeId];
+    }
+
+    /**
+     * @notice Returns if the token is on queue to wait for trade
+     * @param tokenId The token id of the NFT
+     *
+     */
+    function isTokenOnQueue(uint256 tokenId) external view returns (bool) {
+        return s_onqueue[tokenId];
+    }
+
+    /**
+     * @notice check the owner/holder of the NFT `tokenId`
+     * @param tokenId The token id of the NFT
+     *
+     */
+    function ownerOf(uint tokenId) public view override(INFT, ERC721) returns (address) {
+        return _ownerOf(tokenId);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                               validation
+    //////////////////////////////////////////////////////////////*/
+
+    function _isValidate(address _owner, uint256 _tokenId) private view returns (bool) {
+        return 
+            _ownerOf(_tokenId) == _owner && 
+            !s_onqueue[_tokenId];
+    }
+
+    function _setTokenOnQueue(uint256 _tokenId, uint8 _value) private {
+        assembly {
+            mstore(0x00, _tokenId)
+            mstore(0x20, s_onqueue.slot)
+            let queueSlot := keccak256(0x00, 0x40)
+            sstore(queueSlot, _value)
+        }
     }
 
 }

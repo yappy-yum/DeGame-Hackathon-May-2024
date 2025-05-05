@@ -94,22 +94,22 @@ contract STKM is ISTKM, ERC20("STICKMAN", "STKM"), Ownable(msg.sender) {
      * @notice msg.sender (spender) spend/send _amount of STKM to _receiver 
      *         that belongs to _owner
      *
-     * @param _owner the belonger of the STMK to be spent by msg.sender
+     * @param _sender the belonger of the STMK to be spent by msg.sender
      * @param _receiver the receiver of the transaction
      * @param _amount the amount of STKM to be sent
      *              
      */
     function transferFrom(
-        address _owner, 
+        address _sender, 
         address _receiver, 
         uint _amount
     ) public override(ISTKM, ERC20) returns(bool) {
         if (_amount == 0) revert STKM__transferZero();
 
-        super.transferFrom(_owner, _receiver, _amount);
+        super.transferFrom(_sender, _receiver, _amount);
 
         _mintUserAccruedRewards(_receiver);
-        _mintUserAccruedRewards(_owner);
+        _mintUserAccruedRewards(_sender);
         _mintUserAccruedRewards(msg.sender);    
         
         return true;
@@ -230,7 +230,7 @@ contract STKM is ISTKM, ERC20("STICKMAN", "STKM"), Ownable(msg.sender) {
         // no rewards for zero balance and/or within a day after the updates
         if (timeElapsed < 1 days || currentBal == 0) return 0;
 
-        return 1_000_000_000_000 * (timeElapsed / 1 days);
+        return (1_000_000_000_000 * timeElapsed) / 1 days;
     }
 
 }
