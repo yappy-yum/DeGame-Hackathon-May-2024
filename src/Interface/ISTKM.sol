@@ -91,4 +91,10 @@ interface ISTKM {
      */
     function checkInterestLastUpdate(address _user) external view returns(uint);
 
+    /**
+     * check total decimals the returned value has
+     *
+     */
+    function decimals() external view returns (uint8);
+
 }

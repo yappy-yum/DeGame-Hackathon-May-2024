@@ -11,11 +11,14 @@ import {STKM} from "src/factory/STKM.sol";
 import {NFT} from "src/factory/NFT.sol";
 import {INFT} from "src/Interface/INFT.sol";
 
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
 contract Game_T is Test, fundBalance {
+    using Strings for uint256;
 
     Game game;
+    string baseURI = "ipfs://bafybeie5ztgmhxv2gyx3nwzdj3c36vbyqfuxsw4vahnke4j2aik27dd7s4";
 
     address Owner = makeAddr("Owner");
     address Alice = makeAddr("Alice");
@@ -26,6 +29,30 @@ contract Game_T is Test, fundBalance {
         Game_S G = new Game_S();
         game = G.run();
     }
+
+    /*//////////////////////////////////////////////////////////////
+                             Token Setting
+    //////////////////////////////////////////////////////////////*/
+
+    function test_setting_baseURI() public view {
+        assertEq(game.getBaseURI(), baseURI);
+
+        for (uint i = 0; i < 10000; i++) {
+            if (i == 0 || i > 23) {
+                assertEq(game.getTokenURI(i), "");
+            } else {
+                assertEq(
+                    game.getTokenURI(i), 
+                    string.concat(
+                        baseURI, 
+                        "/", 
+                        i.toString(), 
+                        ".json"
+                    )
+                );
+            }
+        }
+    }     
 
     /*//////////////////////////////////////////////////////////////
                                 buySTKM

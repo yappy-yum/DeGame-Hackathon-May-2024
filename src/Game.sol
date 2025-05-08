@@ -11,10 +11,12 @@ contract Game is SafeModifier(msg.sender) {
     error Game__TransactionFailed();
     error Game__NFTPaymentFailed();
     error Game__MustMoreThanNFTPrice();
+    error Game__NoSTKMBought();
+    error Game__OnlyNeon();
 
     ISTKM private immutable I_STKM;  
     INFT private immutable I_NFT;
-    uint constant public NFT_PRICE = 1 ether;
+    uint constant public NFT_PRICE = 7000 * 1e18;
 
     constructor(ISTKM _STKM, INFT _NFT) { I_STKM = _STKM; I_NFT = _NFT; }
 
@@ -23,6 +25,7 @@ contract Game is SafeModifier(msg.sender) {
     //////////////////////////////////////////////////////////////*/
 
     function buySTKM() external payable onlyEOA(msg.sender) noReentrant {
+        if (block.chainid != 245022926 && block.chainid != 245022934) revert Game__OnlyNeon();
         I_STKM.buySTKM(msg.sender, msg.value);
     }   
 
@@ -43,6 +46,10 @@ contract Game is SafeModifier(msg.sender) {
 
     function STKMBalanceOf() external view returns (uint256) {
         return I_STKM.balanceOf(msg.sender);
+    }
+
+    function STKMDecimals() external view returns (uint256) {
+        return I_STKM.decimals();
     }
 
     function CheckRewardsLatestUpdateTime() external view returns (uint256) {
@@ -79,7 +86,9 @@ contract Game is SafeModifier(msg.sender) {
         I_STKM.withdrawSTKM(msg.sender, sellingPrice);
     }
 
-    function StartTrade(address _opponent, uint256 _yourTokenId, uint256 _opponentTokenId) external onlyEOA(msg.sender) noReentrant returns(uint tradeId) {
+    function StartTrade(address _opponent, uint256 _yourTokenId, uint256 _opponentTokenId) 
+        external onlyEOA(msg.sender) noReentrant returns(uint tradeId) 
+    {
         return I_NFT.createTrade(msg.sender, _opponent, _yourTokenId, _opponentTokenId);
     }
 
@@ -105,6 +114,14 @@ contract Game is SafeModifier(msg.sender) {
 
     function getPastTradeHistory(uint256 _tradeId) external view returns (INFT.Trade memory) {
         return I_NFT.getPastTradeHistory(_tradeId);
+    }
+
+    function getBaseURI() external view returns (string memory) {
+        return I_NFT.baseURI();
+    }
+
+    function getTokenURI(uint256 _tokenId) external view returns (string memory) {
+        return I_NFT.tokenURI(_tokenId);
     }
 
     /*//////////////////////////////////////////////////////////////

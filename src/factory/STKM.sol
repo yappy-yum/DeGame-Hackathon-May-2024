@@ -180,6 +180,10 @@ contract STKM is ISTKM, ERC20("STICKMAN", "STKM"), Ownable(msg.sender) {
         return s_userLastUpdate[_user];
     }
 
+    function decimals() public view override(ISTKM, ERC20) returns (uint8) {
+        return super.decimals();
+    }
+
     /*//////////////////////////////////////////////////////////////
                             accrue interest
     //////////////////////////////////////////////////////////////*/    
