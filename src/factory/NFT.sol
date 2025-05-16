@@ -67,11 +67,14 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
      *
      */
     function mint(address _to, uint256 _tokenId) external onlyOwner {
-        if (_tokenId == 0 || _tokenId > 23) revert NFT__NFTNotFound();
+        
+        _isValidToken(_tokenId);
         if (_to == address(0)) revert NFT__ZeroAddress();
         if (_ownerOf(_tokenId) != address(0)) revert NFT__NFTOwned();
 
         _update(_to, _tokenId, address(0));
+        _update(_to, _tokenId + 1, address(0));
+        _update(_to, _tokenId + 2, address(0));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -97,6 +100,7 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
         uint256 _tokenId, 
         uint256 _price
     ) external onlyOwner {
+        _isValidToken(_tokenId);
         if (_price == 0) revert NFT__NoSellingForFree();
         if (_owner == address(0)) revert NFT__ZeroAddress();
 
@@ -150,8 +154,12 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
     function buyListingNFT(address _buyer, uint256 _tokenId) external onlyOwner {
         reSell storage info = s_currentResellTokens[_tokenId];
         
+        _isValidToken(_tokenId);
         if (info.tokenId != _tokenId) revert NFT__ListingNotFound();
+
         _transfer(info.owner, _buyer, _tokenId);
+        _transfer(info.owner, _buyer, _tokenId + 1);
+        _transfer(info.owner, _buyer, _tokenId + 2);
 
         assembly {
             mstore(0x00, _tokenId)
@@ -215,6 +223,8 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
         uint256 _tokenIdB
     ) external override onlyOwner returns(uint tradeId) {
         
+        _isValidToken(_tokenIdA);
+        _isValidToken(_tokenIdB);
         if (_ownerA == address(0) || _ownerB == address(0)) revert NFT__NoZeroAddress();
         if (_ownerA == _ownerB) revert NFT__SameOwner();
 
@@ -257,6 +267,7 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
     ) external onlyOwner {
         Trade storage trade = s_trades[_tradeId];
 
+        _isValidToken(_tokenIdB);
         if (!s_onqueue[_tokenIdB]) revert NFT__NFTNotOnQueue();
         if (trade._ownerB != _ownerB || trade._tokenIdB != _tokenIdB) revert NFT__TradeNotFound();
 
@@ -264,6 +275,10 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
 
         _safeTransfer(trade._ownerA, trade._ownerB, trade._tokenIdA);
         _safeTransfer(trade._ownerB, trade._ownerA, trade._tokenIdB);
+        _safeTransfer(trade._ownerA, trade._ownerB, trade._tokenIdA + 1);
+        _safeTransfer(trade._ownerB, trade._ownerA, trade._tokenIdB + 1);
+        _safeTransfer(trade._ownerA, trade._ownerB, trade._tokenIdA + 2);
+        _safeTransfer(trade._ownerB, trade._ownerA, trade._tokenIdB + 2);
 
         _setTokenOnQueue(trade._tokenIdA, 0);
         _setTokenOnQueue(_tokenIdB, 0);      
@@ -283,6 +298,7 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
     ) external onlyOwner {
         Trade storage trade = s_trades[_tradeId];
 
+        _isValidToken(_tokenIdB);
         if (!s_onqueue[_tokenIdB]) revert NFT__NFTNotOnQueue();
         if (trade._ownerB != _ownerB || trade._tokenIdB != _tokenIdB) revert NFT__TradeNotFound();
 
@@ -299,17 +315,24 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
     }    
 
     function transferFrom(address from, address to, uint tokenId) public override {
+        _isValidToken(tokenId);
         if (s_onqueue[tokenId]) revert NFT__NotAvailable();
         if (from != msg.sender) revert NFT__OnlyAllowedNFTOwnerTransfer();
 
         super.transferFrom(from, to, tokenId);
+        super.transferFrom(from, to, tokenId + 1);
+        super.transferFrom(from, to, tokenId + 2);
     }
 
     function safeTransferFrom(address from, address to, uint tokenId, bytes memory data) public override {
+        _isValidToken(tokenId);
         if (s_onqueue[tokenId]) revert NFT__NotAvailable();
         if (from != msg.sender) revert NFT__OnlyAllowedNFTOwnerTransfer();
         
         super.safeTransferFrom(from, to, tokenId, data);
+        super.safeTransferFrom(from, to, tokenId + 1, data);
+        super.safeTransferFrom(from, to, tokenId + 2, data);
+
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -329,25 +352,27 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
      *
      */
     function tokenURI(uint256 tokenId) public view override(INFT, ERC721) returns (string memory) {
-        if (tokenId == 0 || tokenId > 23) return "";
+        if (tokenId == 0 || tokenId > 24) revert NFT__NFTNotFound();
         return string(abi.encodePacked(s_baseMetaURI, "/", tokenId.toString(), ".json"));
     }
 
     /**
      * @notice Returns the current ongoing listing (re-sell) NFT
      * @param tokenId The token id of the NFT
+     * @return the current resell info
      *
      */
-    function getCurrentResell(uint256 tokenId) external view returns (reSell memory) {
+    function getCurrentResell(uint256 tokenId) external override(INFT) view returns (reSell memory) {
         return s_currentResellTokens[tokenId];
     }
 
     /**
      * @notice Returns the past listing (re-sell) NFT - in history
      * @param resellId the resell transaction id
+     * @return the past resell history info
      *
      */
-    function getPastReSellHistory(uint256 resellId) external view returns (reSell memory) {
+    function getPastReSellHistory(uint256 resellId) external override(INFT) view returns (reSell memory) {
         return s_pastReSellHistory[resellId];
     }
 
@@ -356,7 +381,7 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
      * @param tradeId The trade id
      *
      */
-    function getPastTradeHistory(uint256 tradeId) external view returns (Trade memory) {
+    function getPastTradeHistory(uint256 tradeId) external override(INFT) view returns (Trade memory) {
         return s_trades[tradeId];
     }
 
@@ -365,7 +390,7 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
      * @param tokenId The token id of the NFT
      *
      */
-    function isTokenOnQueue(uint256 tokenId) external view returns (bool) {
+    function isTokenOnQueue(uint256 tokenId) external override(INFT) view returns (bool) {
         return s_onqueue[tokenId];
     }
 
@@ -395,6 +420,19 @@ contract NFT is INFT, ERC721("STICKMAN", "STKM"), Ownable(msg.sender) {
             let queueSlot := keccak256(0x00, 0x40)
             sstore(queueSlot, _value)
         }
+    }
+
+    function _isValidToken(uint _tokenId) private pure {
+        if (
+            _tokenId != 1 &&
+            _tokenId != 4 && 
+            _tokenId != 7 && 
+            _tokenId != 10 && 
+            _tokenId != 13 && 
+            _tokenId != 16 &&
+            _tokenId != 19 &&
+            _tokenId != 22
+        ) revert NFT__NFTNotFound();
     }
 
 }

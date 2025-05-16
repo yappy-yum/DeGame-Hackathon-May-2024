@@ -16,7 +16,7 @@ contract Game is SafeModifier(msg.sender) {
 
     ISTKM private immutable I_STKM;  
     INFT private immutable I_NFT;
-    uint constant public NFT_PRICE = 7000 * 1e18;
+    uint constant public NFT_PRICE = 500 * 1e18;
 
     constructor(ISTKM _STKM, INFT _NFT) { I_STKM = _STKM; I_NFT = _NFT; }
 
@@ -122,6 +122,10 @@ contract Game is SafeModifier(msg.sender) {
 
     function getTokenURI(uint256 _tokenId) external view returns (string memory) {
         return I_NFT.tokenURI(_tokenId);
+    }
+
+    function getNFTOriginalPrice() external pure returns(uint) {
+        return NFT_PRICE;
     }
 
     /*//////////////////////////////////////////////////////////////
